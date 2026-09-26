@@ -44,7 +44,6 @@
          add_action('manage_activity_posts_custom_column', array($this, 'manageActivityColumns'), 10, 2);
          add_action('activated_plugin', array($this, 'trackPluginActivation'));
          add_action('deactivated_plugin', array($this, 'trackPluginDeactivation'));
-         add_action('exportPostTypeToLog', array($this, 'exportPostTypeToLog'));
 
 
      }
@@ -344,42 +343,6 @@
      public function removePublishBox()
      {
          remove_meta_box('submitdiv', 'activity', 'side');
-     }
-
-     public function exportPostTypeToLog()
-     {
-         // Consulta para recuperar todas las entradas del tipo de publicación personalizada
-         $args = array(
-             'post_type' => 'activity',
-             'posts_per_page' => -1, // Obtener todas las entradas
-             'post_status' => 'publish', // O el estado deseado
-         );
-
-         $query = new WP_Query($args);
-
-         // Nombre del archivo de registro
-         $log_filename = 'post_type_export.log';
-
-         // Abre el archivo de registro para escritura (o crea uno nuevo si no existe)
-         $log_file = fopen($log_filename, 'w');
-
-         if ($query->have_posts()) {
-             while ($query->have_posts()) {
-                 $query->the_post();
-                 $post_title = get_the_title();
-                 $post_content = get_the_content();
-                 $log_entry = "Title: $post_title\nContent: $post_content\n\n";
-
-                 // Escribe la entrada en el archivo de registro
-                 fwrite($log_file, $log_entry);
-             }
-         }
-
-         // Cierra el archivo de registro
-         fclose($log_file);
-
-         // Restaura la consulta original de WordPress
-         wp_reset_postdata();
      }
 
  }
