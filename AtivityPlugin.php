@@ -1,23 +1,25 @@
 <?php
-
-/*
-    Plugin Name: Activity Tool
-    Description: A WordPress activity log plugin tracks important events and actions on the website.
-    Version: 1.0
-    Author: RolandoToto
-    Author URI: http://rolandototo.dev
-    License: GPL3
-    License URI: http://www.gnu.org/licenses/gpl-2.0.html
-    Text Domain: activity-tool
-    Requires at least: 5.0
-    Requires PHP: 7.0
+/**
+ * Plugin Name:       Activity Tool
+ * Plugin URI:        https://github.com/rolandototo/Activity-Tool
+ * Description:       Activity log for WordPress: records post, media, user and plugin events in a read-only admin list.
+ * Version:           1.1.0
+ * Requires at least: 6.0
+ * Requires PHP:      7.4
+ * Author:            Rolando Escobar
+ * Author URI:        https://rolandowp.com
+ * License:           GPL-3.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-3.0.html
+ * Text Domain:       activity-tool
+ *
+ * The main file keeps its original name so existing installs stay active.
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class ActivityLogger
+class ActivityToolLogger
 {
     public function __construct()
     {
@@ -70,15 +72,23 @@ class ActivityLogger
         $title = $this->postLabel($post);
 
         if ('trash' === $newStatus) {
-            $message = "{$title} was trashed";
+            /* translators: %s: post title */
+            $message = sprintf(__('%s was trashed', 'activity-tool'), $title);
         } elseif ('trash' === $oldStatus) {
-            $message = "{$title} was restored";
+            /* translators: %s: post title */
+            $message = sprintf(__('%s was restored', 'activity-tool'), $title);
+        } elseif ('publish' === $newStatus && 'publish' === $oldStatus) {
+            /* translators: %s: post title */
+            $message = sprintf(__('%s was updated', 'activity-tool'), $title);
         } elseif ('publish' === $newStatus) {
-            $message = 'publish' === $oldStatus ? "{$title} was updated" : "{$title} was published";
+            /* translators: %s: post title */
+            $message = sprintf(__('%s was published', 'activity-tool'), $title);
         } elseif (in_array($oldStatus, array('new', 'auto-draft'), true)) {
-            $message = "{$title} was created as {$newStatus}";
+            /* translators: 1: post title, 2: post status */
+            $message = sprintf(__('%1$s was created as %2$s', 'activity-tool'), $title, $newStatus);
         } else {
-            $message = "{$title} status changed from {$oldStatus} to {$newStatus}";
+            /* translators: 1: post title, 2: old status, 3: new status */
+            $message = sprintf(__('%1$s status changed from %2$s to %3$s', 'activity-tool'), $title, $oldStatus, $newStatus);
         }
 
         $this->logActivity($message, get_current_user_id(), $post->ID);
@@ -92,22 +102,26 @@ class ActivityLogger
             return;
         }
 
-        $this->logActivity($this->postLabel($post) . ' was permanently deleted', get_current_user_id(), $post->ID);
+        /* translators: %s: post title */
+        $this->logActivity(sprintf(__('%s was permanently deleted', 'activity-tool'), $this->postLabel($post)), get_current_user_id(), $post->ID);
     }
 
     public function trackMediaAdded($postID)
     {
-        $this->logActivity($this->postLabel(get_post($postID)) . ' was added', get_current_user_id(), $postID);
+        /* translators: %s: media title */
+        $this->logActivity(sprintf(__('%s was added', 'activity-tool'), $this->postLabel(get_post($postID))), get_current_user_id(), $postID);
     }
 
     public function trackMediaChanges($postID)
     {
-        $this->logActivity($this->postLabel(get_post($postID)) . ' was modified', get_current_user_id(), $postID);
+        /* translators: %s: media title */
+        $this->logActivity(sprintf(__('%s was modified', 'activity-tool'), $this->postLabel(get_post($postID))), get_current_user_id(), $postID);
     }
 
     public function trackMediaDeleted($postID)
     {
-        $this->logActivity($this->postLabel(get_post($postID)) . ' was deleted', get_current_user_id(), $postID);
+        /* translators: %s: media title */
+        $this->logActivity(sprintf(__('%s was deleted', 'activity-tool'), $this->postLabel(get_post($postID))), get_current_user_id(), $postID);
     }
 
     public function trackUserRegistered($userID)
@@ -115,32 +129,37 @@ class ActivityLogger
         $user = get_userdata($userID);
         // On self-registration nobody is logged in, so the new user is the actor.
         $actor = get_current_user_id() ? get_current_user_id() : $userID;
-        $this->logActivity("User {$user->user_login} was registered", $actor, 0, $userID);
+        /* translators: %s: user login */
+        $this->logActivity(sprintf(__('User %s was registered', 'activity-tool'), $user->user_login), $actor, 0, $userID);
     }
 
     public function trackUserUpdated($userID, $oldUserData)
     {
         $user = get_userdata($userID);
         $actor = get_current_user_id() ? get_current_user_id() : $userID;
-        $this->logActivity("User {$user->user_login} was updated", $actor, 0, $userID);
+        /* translators: %s: user login */
+        $this->logActivity(sprintf(__('User %s was updated', 'activity-tool'), $user->user_login), $actor, 0, $userID);
     }
 
     // Fires before the user is deleted, so the login is still available.
     public function trackUserDeleted($userID)
     {
         $user = get_userdata($userID);
-        $login = $user ? $user->user_login : "#{$userID}";
-        $this->logActivity("User {$login} was deleted", get_current_user_id(), 0, $userID);
+        $login = $user ? $user->user_login : '#' . $userID;
+        /* translators: %s: user login */
+        $this->logActivity(sprintf(__('User %s was deleted', 'activity-tool'), $login), get_current_user_id(), 0, $userID);
     }
 
     public function trackPluginActivation($plugin)
     {
-        $this->logActivity("Plugin '{$this->pluginName($plugin)}' was activated", get_current_user_id());
+        /* translators: %s: plugin name */
+        $this->logActivity(sprintf(__('Plugin "%s" was activated', 'activity-tool'), $this->pluginName($plugin)), get_current_user_id());
     }
 
     public function trackPluginDeactivation($plugin)
     {
-        $this->logActivity("Plugin '{$this->pluginName($plugin)}' was deactivated", get_current_user_id());
+        /* translators: %s: plugin name */
+        $this->logActivity(sprintf(__('Plugin "%s" was deactivated', 'activity-tool'), $this->pluginName($plugin)), get_current_user_id());
     }
 
     /* ------------------------------------------------------------------
@@ -187,9 +206,13 @@ class ActivityLogger
     private function postLabel($post)
     {
         if (!$post) {
-            return 'An item';
+            return __('An item', 'activity-tool');
         }
-        return '' !== $post->post_title ? $post->post_title : "(no title) #{$post->ID}";
+        if ('' !== $post->post_title) {
+            return $post->post_title;
+        }
+        /* translators: %d: post ID */
+        return sprintf(__('(no title) #%d', 'activity-tool'), $post->ID);
     }
 
     private function pluginName($plugin)
@@ -209,9 +232,9 @@ class ActivityLogger
     {
         $args = array(
             'public' => false,
-            'label'  => 'Activity',
+            'label'  => __('Activity', 'activity-tool'),
             'labels' => array(
-                'edit_item' => 'Activity Details',
+                'edit_item' => __('Activity Details', 'activity-tool'),
             ),
             'show_ui' => true,
             'capability_type' => 'post',
@@ -247,8 +270,8 @@ class ActivityLogger
         return array(
             'cb'    => $columns['cb'],
             'title' => $columns['title'],
-            'id'    => __('ID', 'wp-activity'),
-            'user'  => __('User', 'wp-activity'),
+            'id'    => __('ID', 'activity-tool'),
+            'user'  => __('User', 'activity-tool'),
             'date'  => $columns['date'],
         );
     }
@@ -260,7 +283,7 @@ class ActivityLogger
             case 'id':
                 list($itemID, $link) = $this->affectedItem($postID);
                 if (!$itemID) {
-                    echo 'N/A';
+                    esc_html_e('N/A', 'activity-tool');
                 } elseif ($link) {
                     echo '<a href="' . esc_url($link) . '">' . esc_html($itemID) . '</a>';
                 } else {
@@ -269,7 +292,7 @@ class ActivityLogger
                 break;
             case 'user':
                 $userInfo = get_userdata(get_post_meta($postID, '_activity_user_id', true));
-                echo $userInfo ? esc_html($userInfo->user_login) : 'N/A';
+                echo $userInfo ? esc_html($userInfo->user_login) : esc_html__('N/A', 'activity-tool');
                 break;
         }
     }
@@ -298,17 +321,19 @@ class ActivityLogger
     {
         $userInfo = get_userdata(get_post_meta($post->ID, '_activity_user_id', true));
         list($itemID) = $this->affectedItem($post->ID);
-        echo '<div><strong>Activity:</strong> ' . esc_html($post->post_title) . '</div>';
-        echo '<div><strong>User:</strong> ' . esc_html($userInfo ? $userInfo->user_login : 'N/A') . '</div>';
-        echo '<div><strong>Date:</strong> ' . esc_html($post->post_date) . '</div>';
-        echo '<div><strong>ID:</strong> ' . esc_html($itemID ? $itemID : 'N/A') . '</div>';
+        $na = __('N/A', 'activity-tool');
+
+        echo '<div><strong>' . esc_html__('Activity:', 'activity-tool') . '</strong> ' . esc_html($post->post_title) . '</div>';
+        echo '<div><strong>' . esc_html__('User:', 'activity-tool') . '</strong> ' . esc_html($userInfo ? $userInfo->user_login : $na) . '</div>';
+        echo '<div><strong>' . esc_html__('Date:', 'activity-tool') . '</strong> ' . esc_html($post->post_date) . '</div>';
+        echo '<div><strong>' . esc_html__('ID:', 'activity-tool') . '</strong> ' . esc_html($itemID ? $itemID : $na) . '</div>';
     }
 
     public function addActivityDetailBox()
     {
         add_meta_box(
             'activity_details',
-            'Activity Details',
+            __('Activity Details', 'activity-tool'),
             array($this, 'displayActivityDetails'),
             'activity',
             'normal',
@@ -322,7 +347,7 @@ class ActivityLogger
         if ('activity' === $post->post_type) {
             unset($actions['inline hide-if-no-js']);
             if (isset($actions['edit'])) {
-                $actions['edit'] = '<a href="' . esc_url(get_edit_post_link($post->ID)) . '">View</a>';
+                $actions['edit'] = '<a href="' . esc_url(get_edit_post_link($post->ID)) . '">' . esc_html__('View', 'activity-tool') . '</a>';
             }
         }
         return $actions;
@@ -346,4 +371,4 @@ class ActivityLogger
     }
 }
 
-new ActivityLogger();
+new ActivityToolLogger();
