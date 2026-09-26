@@ -87,13 +87,18 @@
      {
          switch ($column) {
              case 'id':
-                 $trackedItemID = get_post_meta($postID, '_modified_post_id', true);
-                 echo $trackedItemID ? "<a href='" . get_edit_post_link($trackedItemID) . "'>$trackedItemID</a>" : 'N/A';
+                 $trackedItemID = (int) get_post_meta($postID, '_modified_post_id', true);
+                 $editLink = $trackedItemID ? get_edit_post_link($trackedItemID) : '';
+                 if ($editLink) {
+                     echo '<a href="' . esc_url($editLink) . '">' . esc_html($trackedItemID) . '</a>';
+                 } else {
+                     echo $trackedItemID ? esc_html($trackedItemID) : 'N/A';
+                 }
                  break;
              case 'user':
                  $userID = get_post_meta($postID, '_activity_user_id', true);
                  $userInfo = get_userdata($userID);
-                 echo $userInfo ? $userInfo->user_login : 'N/A';
+                 echo $userInfo ? esc_html($userInfo->user_login) : 'N/A';
                  break;
                  // Handle other custom columns if needed
          }
@@ -174,10 +179,10 @@
          $userID = get_post_meta($post->ID, '_activity_user_id', true);
          $userInfo = get_userdata($userID);
          $modifiedPostID = get_post_meta($post->ID, '_modified_post_id', true);
-         echo "<div><strong>Activity:</strong> {$post->post_title}</div>";
-         echo "<div><strong>User:</strong> {$userInfo->user_login}</div>";
-         echo "<div><strong>Date:</strong> {$post->post_date}</div>";
-         echo "<div><strong>ID:</strong> {$modifiedPostID}</div>";
+         echo '<div><strong>Activity:</strong> ' . esc_html($post->post_title) . '</div>';
+         echo '<div><strong>User:</strong> ' . esc_html($userInfo ? $userInfo->user_login : 'N/A') . '</div>';
+         echo '<div><strong>Date:</strong> ' . esc_html($post->post_date) . '</div>';
+         echo '<div><strong>ID:</strong> ' . esc_html($modifiedPostID) . '</div>';
 
      }
 
@@ -254,13 +259,6 @@
          $activityID = wp_insert_post($activityArgs);
          add_post_meta($activityID, '_activity_user_id', $currentUser->ID, true);
          add_post_meta($activityID, '_modified_post_id', $postID, true);
-     }
-
-     public function displayActivityUser($post)
-     {
-         $userID = get_post_meta($post->ID, '_activity_user_id', true);
-         $userInfo = get_userdata($userID);
-         echo "<div>User: {$userInfo->user_login}</div>";
      }
 
      public function registerActivityPostType()
