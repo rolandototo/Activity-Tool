@@ -3,7 +3,7 @@
  * Plugin Name:       Activity Tool
  * Plugin URI:        https://github.com/rolandototo/Activity-Tool
  * Description:       Activity log for WordPress: records post, media, user and plugin events in a read-only admin list.
- * Version:           1.1.0
+ * Version:           1.2.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Rolando Escobar
@@ -47,6 +47,9 @@ class ActivityToolLogger
         add_action('user_register', array($this, 'trackUserRegistered'));
         add_action('profile_update', array($this, 'trackUserUpdated'), 10, 2);
         add_action('delete_user', array($this, 'trackUserDeleted'));
+        // On multisite, deleting a user from the network fires wpmu_delete_user
+        // instead of delete_user.
+        add_action('wpmu_delete_user', array($this, 'trackUserDeleted'));
 
         // Plugins
         add_action('activated_plugin', array($this, 'trackPluginActivation'));
@@ -192,15 +195,22 @@ class ActivityToolLogger
         ));
     }
 
-    // Only content types with an admin UI are logged; internal types such as
-    // revisions, menu items and changesets are skipped.
+    // By default only content types with an admin UI are logged; internal types
+    // such as revisions, menu items and changesets are skipped.
     private function isTrackedPost($post)
     {
         if (!$post || 'activity' === $post->post_type) {
             return false;
         }
         $type = get_post_type_object($post->post_type);
-        return $type && $type->show_ui;
+
+        /**
+         * Filters whether status changes and deletes of a post are logged.
+         *
+         * @param bool    $tracked Default true for post types with an admin UI.
+         * @param WP_Post $post    The post.
+         */
+        return (bool) apply_filters('activity_tool_track_post', $type && $type->show_ui, $post);
     }
 
     private function postLabel($post)
@@ -230,6 +240,16 @@ class ActivityToolLogger
 
     public function registerActivityPostType()
     {
+        /**
+         * Filters the capability needed to see and delete log entries.
+         *
+         * @param string $capability Default "manage_options" (administrators).
+         */
+        $cap = apply_filters('activity_tool_capability', 'manage_options');
+        if (!is_string($cap) || '' === $cap) {
+            $cap = 'manage_options';
+        }
+
         $args = array(
             'public' => false,
             'label'  => __('Activity', 'activity-tool'),
@@ -242,21 +262,22 @@ class ActivityToolLogger
             'rewrite' => false,
             'query_var' => false,
             'supports' => false,
-            // Only administrators can see or delete entries, and nobody can
-            // create or publish them by hand. With capability_type "post",
-            // editors could otherwise read and delete the log.
+            // Only users with $cap (administrators by default) can see or
+            // delete entries, and nobody can create or publish them by hand.
+            // With capability_type "post", editors could otherwise read and
+            // delete the log.
             'capabilities' => array(
                 'create_posts'           => 'do_not_allow',
                 'publish_posts'          => 'do_not_allow',
-                'edit_posts'             => 'manage_options',
-                'edit_others_posts'      => 'manage_options',
-                'edit_published_posts'   => 'manage_options',
-                'edit_private_posts'     => 'manage_options',
-                'read_private_posts'     => 'manage_options',
-                'delete_posts'           => 'manage_options',
-                'delete_others_posts'    => 'manage_options',
-                'delete_published_posts' => 'manage_options',
-                'delete_private_posts'   => 'manage_options',
+                'edit_posts'             => $cap,
+                'edit_others_posts'      => $cap,
+                'edit_published_posts'   => $cap,
+                'edit_private_posts'     => $cap,
+                'read_private_posts'     => $cap,
+                'delete_posts'           => $cap,
+                'delete_others_posts'    => $cap,
+                'delete_published_posts' => $cap,
+                'delete_private_posts'   => $cap,
             ),
             'map_meta_cap' => true,
             'menu_icon' => 'dashicons-clock',
